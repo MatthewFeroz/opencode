@@ -11,6 +11,7 @@ import { ServerConnection, useServer } from "./server"
 import { createRefCountMap } from "@/utils/refcount"
 import { useGlobal } from "./global"
 import { ServerScope } from "@/utils/server-scope"
+import { WorkspaceOperation } from "@/utils/workspace-operation"
 
 const isAbortError = (error: unknown) =>
   error !== null && typeof error === "object" && "name" in error && error.name === "AbortError"
@@ -66,6 +67,16 @@ export function coalesceServerEvents(events: QueuedServerEvent[]) {
     output.push(event)
   })
   return output
+}
+
+export function applyWorkspaceOperationEvent(scope: ServerScope, event: QueuedServerEvent) {
+  if (event.payload.current?.type !== "session.moved") return false
+  WorkspaceOperation.complete(
+    scope,
+    event.payload.current.data.sessionID,
+    event.payload.current.data.location.directory,
+  )
+  return true
 }
 
 function currentDelta(event: OpenCodeEvent | undefined): CurrentDelta | undefined {
@@ -151,7 +162,10 @@ function createServerSdkContextBase(server: ServerConnection.Any, scope: ServerS
     last = Date.now()
     const output = coalesceServerEvents(events)
     batch(() => {
-      output.forEach((event) => emitter.emit(event.directory, event.payload))
+      output.forEach((event) => {
+        applyWorkspaceOperationEvent(scope, event)
+        emitter.emit(event.directory, event.payload)
+      })
     })
 
     buffer.length = 0

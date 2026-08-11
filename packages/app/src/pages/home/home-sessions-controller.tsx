@@ -19,6 +19,7 @@ import { compareSessionTime, displayName, errorMessage, projectForSession } from
 import { useSessionTabAvatarState } from "@/pages/layout/project-avatar-state"
 import { pathKey } from "@/utils/path-key"
 import { showToast } from "@/utils/toast"
+import { WorkspaceOperation } from "@/utils/workspace-operation"
 import { Binary } from "@opencode-ai/core/util/binary"
 import { archiveHomeSession } from "../home-session-archive"
 import type { HomeController } from "./home-controller"
@@ -208,6 +209,7 @@ export function createHomeSessionsController(home: HomeController) {
         const conn = home.server.focused()
         const ctx = home.server.focusedContext()
         if (!conn || !ctx) return
+        if (WorkspaceOperation.get(ctx.sdk.scope, session.id)?.status === "pending") return
         const [, setStore] = ctx.sync.child(session.location.directory)
         await archiveHomeSession({
           server: ServerConnection.key(conn),

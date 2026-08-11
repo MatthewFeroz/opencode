@@ -175,6 +175,14 @@ export async function mockOpenCodeServer(page: Page, config: MockServerConfig) {
     if (path === "/api/project") return json(route, [config.project])
     if (path === "/api/project/current")
       return json(route, { id: (config.project as { id?: string }).id, directory: config.directory })
+    if (/^\/api\/project\/[^/]+\/directories$/.test(path))
+      return json(route, [
+        { directory: config.directory },
+        ...((config.project as { sandboxes?: string[] }).sandboxes ?? []).map((directory) => ({
+          directory,
+          strategy: "git_worktree",
+        })),
+      ])
     if (path === "/api/location") return json(route, location(config))
     const projectCopy = path.match(/^\/experimental\/project\/([^/]+)\/copy$/)?.[1]
     if (projectCopy && route.request().method() === "POST") {
@@ -243,7 +251,10 @@ export async function mockOpenCodeServer(page: Page, config: MockServerConfig) {
       const limit = Number(url.searchParams.get("limit") ?? 50)
       const offset = Number(url.searchParams.get("cursor") ?? 0)
       const sessions = config.sessions
-        .filter((session) => !directory || session.directory === directory)
+        .filter((session) => {
+          const location = session.location as { directory?: string } | undefined
+          return !directory || location?.directory === directory || session.directory === directory
+        })
         .filter((session) => parentID !== "null" || session.parentID === undefined)
         .filter((session) => {
           const search = url.searchParams.get("search")?.toLowerCase()
@@ -466,6 +477,7 @@ function currentPermission(value: unknown) {
 
 export function currentSession(session: { id: string } & Record<string, unknown>, fallbackDirectory?: string) {
   const time = session.time && typeof session.time === "object" ? session.time : {}
+  const location = session.location && typeof session.location === "object" ? session.location : {}
   return {
     id: session.id,
     parentID: session.parentID,
@@ -483,10 +495,19 @@ export function currentSession(session: { id: string } & Record<string, unknown>
     },
     title: session.title ?? session.id,
     location: {
-      directory: typeof session.directory === "string" ? session.directory : fallbackDirectory,
-      ...(typeof session.workspaceID === "string" ? { workspaceID: session.workspaceID } : {}),
+      directory:
+        "directory" in location && typeof location.directory === "string"
+          ? location.directory
+          : typeof session.directory === "string"
+            ? session.directory
+            : fallbackDirectory,
+      ...(typeof session.workspaceID === "string"
+        ? { workspaceID: session.workspaceID }
+        : "workspaceID" in location && typeof location.workspaceID === "string"
+          ? { workspaceID: location.workspaceID }
+          : {}),
     },
-    subpath: session.path,
+    subpath: session.subpath ?? session.path,
     revert: session.revert,
   }
 }

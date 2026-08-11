@@ -5,6 +5,7 @@ import { groupParts, renderable, type PartGroup } from "@opencode-ai/session-ui/
 import { TimelineRow, type SummaryDiff } from "./timeline-row"
 import { uniqueSummaryDiffs } from "./summary-diffs"
 import { compareMessages } from "@/utils/session-message"
+import { insertAfterUserMessage } from "./row-reconciliation"
 
 export { TimelineRow, type SummaryDiff } from "./timeline-row"
 
@@ -28,6 +29,10 @@ export type TimelineRowMap = {
   }
   Thinking: { userMessageID: string; reasoningHeading?: string }
   Retry: { userMessageID: string }
+  WorkspaceLifecycle: {
+    userMessageID: string
+    notice: TimelineRow.WorkspaceLifecycle["notice"]
+  }
   DiffSummary: { userMessageID: string; diffs: SummaryDiff[] }
   Error: { userMessageID: string; text: string }
 }
@@ -41,6 +46,7 @@ export namespace Timeline {
     status: SessionStatus["type"],
     inlineComments: boolean,
     projectedUserMessages: UserMessage[],
+    afterUser?: (message: UserMessage) => TimelineRow.TimelineRow[],
   ) {
     const turns: { user: UserMessage; assistants: AssistantMessage[] }[] = []
     const turnByUserID = new Map<string, (typeof turns)[number]>()
@@ -83,8 +89,8 @@ export namespace Timeline {
     const activeMessageID = turns.at(-1)?.user.id
     return {
       activeMessageID,
-      rows: turns.flatMap((turn, index) =>
-        constructMessageRows(
+      rows: turns.flatMap((turn, index) => {
+        const rows = constructMessageRows(
           turn.user,
           getMessageParts,
           turn.assistants,
@@ -93,8 +99,10 @@ export namespace Timeline {
           status,
           turn.user.id === activeMessageID,
           inlineComments,
-        ),
-      ),
+        )
+        if (!afterUser) return rows
+        return insertAfterUserMessage(rows, afterUser(turn.user))
+      }),
     }
   }
 

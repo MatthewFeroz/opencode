@@ -103,6 +103,7 @@ export const loadGlobalConfigQuery = (scope: ServerScope) =>
 type ProjectApi = {
   readonly list: () => Promise<ProjectListOutput>
   readonly current: (input?: ProjectCurrentInput) => Promise<ProjectCurrentOutput>
+  readonly directories: ServerApi["project"]["directories"]
 }
 type LocationApi = { readonly get: (input?: LocationGetInput) => Promise<LocationGetOutput> }
 
@@ -116,10 +117,16 @@ export const loadProjectsQuery = (scope: ServerScope, api: ProjectApi) =>
     queryKey: [scope, "project"],
     queryFn: () =>
       retry(() =>
-        api.list().then((projects) => {
-          return projects
-            .filter((p) => !!p?.id)
-            .map(normalizeProjectInfo)
+        api.list().then(async (projects) => {
+          return (await Promise.all(
+            projects.filter((project) => !!project?.id).map(async (project) => {
+              const directories = await api.directories({ projectID: project.id })
+              return normalizeProjectInfo({
+                ...project,
+                sandboxes: directories.filter((item) => item.strategy !== undefined).map((item) => item.directory),
+              })
+            }),
+          ))
             .filter((p) => !!p.worktree && !p.worktree.includes("opencode-test"))
             .slice()
             .sort((a, b) => cmp(a.id, b.id))

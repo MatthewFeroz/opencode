@@ -13,6 +13,14 @@ mock.module("@opencode-ai/session-ui/message-part", () => ({
 }))
 
 const { Timeline, TimelineRow } = await import("./rows")
+const lifecycle = (userMessageID: string) =>
+  new TimelineRow.WorkspaceLifecycle({
+    userMessageID,
+    notice: {
+      type: "operation",
+      operation: { type: "create", status: "complete", directory: "/workspace", messageID: userMessageID },
+    },
+  })
 
 describe("current session timeline rows", () => {
   test("derives turns and tagged rows from chronological current messages", () => {
@@ -47,6 +55,7 @@ describe("current session timeline rows", () => {
       "busy",
       true,
       normalized.messages.filter((message) => message.role === "user"),
+      (message) => (message.id === "msg_3" ? [lifecycle(message.id)] : []),
     )
 
     expect(result.activeMessageID).toBe("msg_3")
@@ -55,6 +64,7 @@ describe("current session timeline rows", () => {
       "assistant-part:msg_1:msg_2:text:0",
       "turn-gap:msg_3",
       "user-message:msg_3",
+      "workspace-lifecycle:msg_3:operation",
       "assistant-part:msg_3:msg_4:reasoning:0",
     ])
   })
@@ -83,11 +93,13 @@ describe("current session timeline rows", () => {
       "idle",
       true,
       normalized.messages.filter((message) => message.role === "user"),
+      (message) => [lifecycle(message.id)],
     )
 
     expect(result.activeMessageID).toBe("msg_shell")
     expect(result.rows.map(TimelineRow.key)).toEqual([
       "user-message:msg_shell",
+      "workspace-lifecycle:msg_shell:operation",
       "assistant-part:msg_shell:msg_shell:tool",
     ])
   })
@@ -157,6 +169,7 @@ describe("current session timeline rows", () => {
       "busy",
       true,
       [...normalized.messages.filter((message) => message.role === "user"), optimistic],
+      (message) => (message.id === optimistic.id ? [lifecycle(message.id)] : []),
     )
 
     expect(result.activeMessageID).toBe(optimistic.id)
@@ -164,6 +177,7 @@ describe("current session timeline rows", () => {
       "user-message:msg_z",
       "turn-gap:msg_a",
       "user-message:msg_a",
+      "workspace-lifecycle:msg_a:operation",
       "thinking:msg_a",
     ])
   })

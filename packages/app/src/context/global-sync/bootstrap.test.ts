@@ -106,16 +106,26 @@ describe("query keys", () => {
   })
 
   test("loads projects from the current endpoint", async () => {
+    const calls: string[] = []
     const api = {
       list: async () => [
         { id: "b", worktree: "/b", time: { created: 1, updated: 1 }, sandboxes: [] },
         { id: "a", worktree: "/a", time: { created: 1, updated: 1 }, sandboxes: [] },
       ],
+      directories: async ({ projectID }: { projectID: string }) => {
+        calls.push(projectID)
+        return [
+          { directory: `/${projectID}` },
+          { directory: `/${projectID}/copy`, strategy: "git_worktree" },
+        ]
+      },
     } as unknown as ProjectApi
 
     const result = await new QueryClient().fetchQuery(loadProjectsQuery(ServerScope.local, api))
 
     expect(result.map((project) => project.id)).toEqual(["a", "b"])
+    expect(result.map((project) => project.sandboxes)).toEqual([["/a/copy"], ["/b/copy"]])
+    expect(calls.toSorted()).toEqual(["a", "b"])
   })
 
   test("loads references from the current location-scoped endpoint", async () => {

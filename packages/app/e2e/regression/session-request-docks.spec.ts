@@ -111,7 +111,7 @@ test("restores the draft caret before typing after a request dock closes", async
   })
   await mockServer(page, { questions: [] })
   await page.goto(`/${base64Encode(directory)}/session/${sessionID}`)
-  await transport.waitForConnection()
+  await transport.waitForConnection({ path: "/api/event" })
   await expectSessionTitle(page, title)
 
   const editor = page.locator('[data-component="prompt-input"][contenteditable="true"]')
@@ -132,32 +132,40 @@ test("restores the draft caret before typing after a request dock closes", async
       }),
     )
     .toBe(cursor)
-  await transport.send({
-    directory,
-    payload: {
-      type: "question.asked",
-      properties: {
-        id: "question-caret",
-        sessionID,
-        questions: [
-          {
-            header: "Continue",
-            question: "Continue?",
-            options: [{ label: "Yes", description: "Continue the session" }],
-          },
-        ],
-        tool: { messageID: "message-caret", callID: "call-caret" },
+  await transport.send(
+    {
+      directory,
+      payload: {
+        type: "question.asked",
+        properties: {
+          id: "question-caret",
+          sessionID,
+          questions: [
+            {
+              header: "Continue",
+              question: "Continue?",
+              options: [{ label: "Yes", description: "Continue the session" }],
+            },
+          ],
+          tool: { messageID: "message-caret", callID: "call-caret" },
+        },
       },
     },
-  })
+    undefined,
+    "/api/event",
+  )
   const question = page.locator('[data-component="dock-prompt"][data-kind="question"]')
   await expect(question).toBeVisible()
   await expect(editor).toHaveCount(0)
 
-  await transport.send({
-    directory,
-    payload: { type: "question.rejected", properties: { sessionID, requestID: "question-caret" } },
-  })
+  await transport.send(
+    {
+      directory,
+      payload: { type: "question.rejected", properties: { sessionID, requestID: "question-caret" } },
+    },
+    undefined,
+    "/api/event",
+  )
   await expect(question).toHaveCount(0)
   await expect(editor).toBeVisible()
   await page.keyboard.press("x")

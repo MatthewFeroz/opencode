@@ -1,6 +1,29 @@
 import { describe, expect, test } from "bun:test"
 import type { OpenCodeEvent } from "@opencode-ai/client/promise"
-import { adaptServerEvent, coalesceServerEvents, enqueueServerEvent, resumeStreamAfterPageShow } from "./server-sdk"
+import {
+  adaptServerEvent,
+  applyWorkspaceOperationEvent,
+  coalesceServerEvents,
+  enqueueServerEvent,
+  resumeStreamAfterPageShow,
+} from "./server-sdk"
+import { ServerScope } from "@/utils/server-scope"
+import { WorkspaceOperation } from "@/utils/workspace-operation"
+
+test("a moved event completes the matching workspace operation", () => {
+  WorkspaceOperation.start(ServerScope.local, "current", "move", "/workspace")
+  applyWorkspaceOperationEvent(ServerScope.local, {
+    directory: "/workspace",
+    payload: adaptServerEvent({
+      id: "moved-current",
+      created: Date.now(),
+      type: "session.moved",
+      durable: { aggregateID: "current", seq: 1, version: 1 },
+      data: { sessionID: "current", location: { directory: "/workspace" } },
+    } satisfies Extract<OpenCodeEvent, { type: "session.moved" }>),
+  })
+  expect(WorkspaceOperation.get(ServerScope.local, "current")?.status).toBe("complete")
+})
 
 describe("resumeStreamAfterPageShow", () => {
   test("restarts a stream only after a back-forward cache restore", () => {
@@ -72,7 +95,7 @@ describe("current event buffering", () => {
         type: "session.tool.input.delta",
         location: { directory: "/repo" },
         data: { sessionID: "ses", assistantMessageID: "msg", id, delta },
-      } as OpenCodeEvent)
+      } satisfies Extract<OpenCodeEvent, { type: "session.tool.input.delta" }>)
     const result = coalesceServerEvents([
       { directory: "/repo", payload: current("evt_1", "call_1", "{") },
       { directory: "/repo", payload: current("evt_2", "call_1", "}") },

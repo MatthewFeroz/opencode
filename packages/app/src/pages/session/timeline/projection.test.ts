@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { PartGroup } from "@opencode-ai/session-ui/message-part"
-import { reuseTimelineRows } from "./row-reconciliation"
+import { insertAfterUserMessage, reuseTimelineRows } from "./row-reconciliation"
 import { TimelineRow } from "./timeline-row"
 
 const context = (key: string, partIDs: string[], userMessageID = "user-1") =>
@@ -93,4 +93,21 @@ describe("reuseTimelineRows", () => {
     expect(new Set(keys(result)).size).toBe(result.length)
     reused.forEach(([resultIndex, previousIndex]) => expect(result[resultIndex]).toBe(previous[previousIndex]))
   })
+})
+
+test("inserts lifecycle extensions immediately after the user message", () => {
+  const rows: TimelineRow.TimelineRow[] = [user(), new TimelineRow.DiffSummary({ userMessageID: "user-1", diffs: [] })]
+  const lifecycle = new TimelineRow.WorkspaceLifecycle({
+    userMessageID: "user-1",
+    notice: {
+      type: "operation",
+      operation: { type: "move", status: "complete", directory: "/workspace", messageID: "user-1" },
+    },
+  })
+
+  expect(insertAfterUserMessage(rows, [lifecycle]).map((row) => row._tag)).toEqual([
+    "UserMessage",
+    "WorkspaceLifecycle",
+    "DiffSummary",
+  ])
 })

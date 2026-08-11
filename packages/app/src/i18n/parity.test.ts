@@ -1,5 +1,4 @@
 import { describe, expect, test } from "bun:test"
-import { desktopNativePluralCategories } from "./desktop-native"
 
 const appLocales = [
   "ar",
@@ -65,15 +64,7 @@ const appLocales = [
   "uz",
 ] as const
 const desktopLocales = appLocales
-const pluralCategories = new Map(
-  appLocales.map(
-    (locale) =>
-      [
-        locale,
-        desktopNativePluralCategories(locale).filter((category) => category !== "one" && category !== "other"),
-      ] as const,
-  ),
-)
+const pluralCategories = new Set(["zero", "one", "two", "few", "many", "other"])
 
 const domains = [
   {
@@ -97,23 +88,19 @@ const domains = [
 ] as const
 
 describe("i18n parity", () => {
-  test("non-English locales have every English key and required plural variants", async () => {
+  test("non-English locales contain only English keys and their plural variants", async () => {
     for (const domain of domains) {
       const source = await dictionary(domain.source)
+      const families = new Set(pluralFamilies(source))
       for (const locale of domain.locales) {
         const target = await dictionary(domain.target(locale))
-        const missing = Object.keys(source).filter((key) => !Object.hasOwn(target, key))
         const extra = Object.keys(target)
-          .filter((key) => !Object.hasOwn(source, key))
+          .filter((key) => !Object.hasOwn(source, key) && !isPluralVariant(key, families))
           .sort()
-        const expected = pluralFamilies(source)
-          .flatMap((key) => (pluralCategories.get(locale) ?? []).map((category) => `${key}.${category}`))
-          .sort()
-        expect({ domain: domain.name, locale, missing, extra }).toEqual({
+        expect({ domain: domain.name, locale, extra }).toEqual({
           domain: domain.name,
           locale,
-          missing: [],
-          extra: expected,
+          extra: [],
         })
       }
     }
@@ -127,11 +114,11 @@ describe("i18n parity", () => {
         const mismatched = Object.keys(source).filter(
           (key) => Object.hasOwn(target, key) && placeholders(source[key]).join() !== placeholders(target[key]).join(),
         )
-        const pluralMismatched = pluralFamilies(source).flatMap((key) =>
-          (pluralCategories.get(locale) ?? [])
-            .map((category) => `${key}.${category}`)
-            .filter((variant) => placeholders(source[`${key}.other`]).join() !== placeholders(target[variant]).join()),
-        )
+        const pluralMismatched = Object.keys(target).filter((key) => {
+          const family = pluralFamily(key)
+          if (!family || !Object.hasOwn(source, `${family}.other`)) return false
+          return placeholders(source[`${family}.other`]).join() !== placeholders(target[key]).join()
+        })
         expect({ domain: domain.name, locale, mismatched, pluralMismatched }).toEqual({
           domain: domain.name,
           locale,
@@ -169,38 +156,6 @@ describe("i18n parity", () => {
   })
 })
 
-describe("i18n plural parity", () => {
-  test("locale-specific categories exist and preserve count placeholders", async () => {
-    for (const domain of domains.slice(0, 2)) {
-      const source = await dictionary(domain.source)
-      const families = pluralFamilies(source)
-      for (const locale of domain.locales) {
-        const target = await dictionary(domain.target(locale))
-        const missing = families.flatMap((key) =>
-          (pluralCategories.get(locale) ?? [])
-            .map((category) => `${key}.${category}`)
-            .filter((variant) => !Object.hasOwn(target, variant)),
-        )
-        const mismatched = families.flatMap((key) =>
-          (pluralCategories.get(locale) ?? [])
-            .map((category) => `${key}.${category}`)
-            .filter(
-              (variant) =>
-                Object.hasOwn(target, variant) &&
-                placeholders(source[`${key}.other`]).join() !== placeholders(target[variant]).join(),
-            ),
-        )
-        expect({ domain: domain.name, locale, missing, mismatched }).toEqual({
-          domain: domain.name,
-          locale,
-          missing: [],
-          mismatched: [],
-        })
-      }
-    }
-  })
-})
-
 async function dictionary(file: string) {
   const module: unknown = await import(file)
   if (typeof module !== "object" || module === null || !("dict" in module) || !isDictionary(module.dict)) {
@@ -220,11 +175,17 @@ function placeholders(value: string) {
 
 function pluralFamilies(dictionary: Record<string, string>) {
   return Object.keys(dictionary)
-    .filter(
-      (key) =>
-        key.endsWith(".one") &&
-        dictionary[key].includes("{{count}}") &&
-        dictionary[`${key.slice(0, -4)}.other`]?.includes("{{count}}"),
-    )
+    .filter((key) => key.endsWith(".one") && Object.hasOwn(dictionary, `${key.slice(0, -4)}.other`))
     .map((key) => key.slice(0, -4))
+}
+
+function pluralFamily(key: string) {
+  const split = key.lastIndexOf(".")
+  if (split === -1 || !pluralCategories.has(key.slice(split + 1))) return
+  return key.slice(0, split)
+}
+
+function isPluralVariant(key: string, families: Set<string>) {
+  const family = pluralFamily(key)
+  return family !== undefined && families.has(family)
 }

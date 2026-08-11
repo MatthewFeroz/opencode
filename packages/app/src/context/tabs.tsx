@@ -177,6 +177,11 @@ export const { use: useTabs, provider: TabsProvider } = createSimpleContext({
     }
 
     const actions = {
+      active() {
+        if (location.pathname === "/") return
+        const key = recentKey()
+        return store.find((tab) => tabKey(tab) === key)
+      },
       addSessionTab: (tab: Omit<SessionTab, "type">) => {
         const next = { type: "session" as const, ...tab }
         const existing = store.find((item) => tabKey(item) === tabKey(next))
