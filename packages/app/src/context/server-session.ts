@@ -16,7 +16,7 @@ type MessageApi = ServerApi["message"]
 const cmp = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
 const SKIP_PARTS = new Set(["patch", "step-start", "step-finish"])
 const initialMessagePageSize = 20
-const historyMessagePageSize = 200
+const historyMessagePageSize = 50
 const sessionInfoLimit = 2_048
 const emptyIDs: ReadonlySet<string> = new Set()
 
@@ -43,6 +43,12 @@ function projectMessageSource(message: Message): SessionMessageInfo[] {
       time: message.time,
     },
   ]
+}
+
+function yieldToMain() {
+  const scheduler = (globalThis as { scheduler?: { yield: () => Promise<void> } }).scheduler
+  if (scheduler) return scheduler.yield()
+  return new Promise<void>((resolve) => setTimeout(resolve, 0))
 }
 
 function needsOlderTurnRoot(source: readonly SessionMessageInfo[]) {
@@ -538,6 +544,7 @@ export function createServerSession(
       if (!response.data.length) break
     }
     const response = pages.at(-1)!
+    await yieldToMain()
     const source = pages.flatMap((page) => page.data).toReversed()
     const normalized = normalizeSessionMessages(sessionID, source)
     return {
