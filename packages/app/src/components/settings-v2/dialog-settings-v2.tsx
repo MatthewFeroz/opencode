@@ -5,16 +5,23 @@ import { Icon } from "@opencode-ai/ui/icon"
 import { useLanguage } from "@/context/language"
 import { usePlatform } from "@/context/platform"
 import { SettingsGeneralV2 } from "./general"
+import { SettingsAppearanceV2 } from "./appearance"
 import { SettingsKeybinds } from "../settings-keybinds"
+import { SettingsNotificationsV2 } from "./notifications"
 import { SettingsProvidersV2 } from "./providers"
 import { SettingsModelsV2 } from "./models"
-import "./settings-v2.css"
 import { SettingsServersV2 } from "./servers"
 import { SettingsWorkspacesV2 } from "./workspaces"
+import { SettingsProjectsV2 } from "./projects"
+import { SettingsExtensionsV2 } from "./extensions"
+import { SettingsServerScope } from "../settings-server-picker"
 import { useDialog } from "@opencode-ai/ui/context/dialog"
 import { useLayout } from "@/context/layout"
 import { useTabs } from "@/context/tabs"
 import { useServerSync } from "@/context/server-sync"
+import { useGlobal } from "@/context/global"
+import { ServerConnection } from "@/context/server"
+import "./settings-v2.css"
 
 export const DialogSettings: Component<{
   sessionID?: string
@@ -26,8 +33,13 @@ export const DialogSettings: Component<{
   const layout = useLayout()
   const tabs = useTabs()
   const serverSync = useServerSync()
+  const global = useGlobal()
+  const currentServer = global.servers.list().find((server) => global.ensureServerCtx(server).sync === serverSync())
+  if (currentServer) global.settings.server.set(ServerConnection.key(currentServer))
   const [tab, setTab] = createSignal(props.defaultValue ?? "general")
   const directory = createMemo(() => {
+    const server = global.settings.server.selected()
+    if (!server || serverSync() !== global.ensureServerCtx(server).sync) return
     const route = layout.route()
     if (route.type === "dir-new-sesssion") return route.dir
     if (route.type === "draft") {
@@ -53,53 +65,72 @@ export const DialogSettings: Component<{
       >
         <TabsV2.List>
           <div class="flex flex-col justify-between h-full w-full">
-            <div class="flex flex-col gap-3 w-full">
-              <div class="flex flex-col gap-3">
-                <div class="flex flex-col gap-1.5">
-                  <TabsV2.SectionTitle>{language.t("settings.section.desktop")}</TabsV2.SectionTitle>
-                  <div class="flex flex-col gap-1.5 w-full">
-                    <TabsV2.Trigger value="general">
-                      <Icon name="sliders" size="small" />
-                      {language.t("settings.tab.general")}
-                    </TabsV2.Trigger>
-                    <TabsV2.Trigger value="shortcuts">
-                      <Icon name="keyboard" size="small" />
-                      {language.t("settings.tab.shortcuts")}
-                    </TabsV2.Trigger>
-                  </div>
-                </div>
+            <div class="flex flex-col gap-4 w-full">
+              <div class="flex flex-col gap-1 w-full">
+                <TabsV2.Trigger value="general">
+                  <Icon name="sliders" size="small" />
+                  {language.t("settings.tab.preferences")}
+                </TabsV2.Trigger>
+                <TabsV2.Trigger value="appearance">
+                  <Icon name="appearance" size="small" />
+                  {language.t("settings.general.section.appearance")}
+                </TabsV2.Trigger>
+                <TabsV2.Trigger value="notifications">
+                  <Icon name="notifications" size="small" />
+                  {language.t("settings.tab.notifications")}
+                </TabsV2.Trigger>
+                <TabsV2.Trigger value="shortcuts">
+                  <Icon name="keyboard" size="small" />
+                  {language.t("settings.tab.shortcuts")}
+                </TabsV2.Trigger>
+              </div>
 
-                <div class="flex flex-col gap-1.5">
-                  <TabsV2.SectionTitle>{language.t("settings.section.server")}</TabsV2.SectionTitle>
-                  <div class="flex flex-col gap-1.5 w-full">
-                    <TabsV2.Trigger value="workspaces">
-                      <Icon name="workspace-isolated" size="small" />
-                      {language.t("settings.tab.workspaces")}
-                    </TabsV2.Trigger>
-                    <TabsV2.Trigger value="servers">
-                      <Icon name="server" size="small" />
-                      {language.t("status.popover.tab.servers")}
-                    </TabsV2.Trigger>
-                    <TabsV2.Trigger value="providers">
-                      <Icon name="providers" size="small" />
-                      {language.t("settings.providers.title")}
-                    </TabsV2.Trigger>
-                    <TabsV2.Trigger value="models">
-                      <Icon name="models" size="small" />
-                      {language.t("settings.models.title")}
-                    </TabsV2.Trigger>
-                  </div>
-                </div>
+              <div class="flex flex-col gap-1 w-full">
+                <TabsV2.Trigger value="workspaces">
+                  <Icon name="workspace-isolated" size="small" />
+                  {language.t("settings.tab.workspaces")}
+                </TabsV2.Trigger>
+                <TabsV2.Trigger value="servers">
+                  <Icon name="server" size="small" />
+                  {language.t("status.popover.tab.servers")}
+                </TabsV2.Trigger>
+                <TabsV2.Trigger value="projects">
+                  <Icon name="folder" size="small" />
+                  {language.t("settings.tab.projects")}
+                </TabsV2.Trigger>
+              </div>
+
+              <div class="flex flex-col gap-1 w-full">
+                <TabsV2.Trigger value="providers">
+                  <Icon name="providers" size="small" />
+                  {language.t("settings.providers.title")}
+                </TabsV2.Trigger>
+                <TabsV2.Trigger value="models">
+                  <Icon name="models" size="small" />
+                  {language.t("settings.models.title")}
+                </TabsV2.Trigger>
+                <TabsV2.Trigger value="extensions">
+                  <Icon name="extensions" size="small" />
+                  {language.t("settings.tab.extensions")}
+                </TabsV2.Trigger>
               </div>
             </div>
+
             <div class="settings-v2-nav-footer">
               <span>{language.t("app.name.desktop")}</span>
               <span>v{platform.version}</span>
             </div>
           </div>
         </TabsV2.List>
+
         <TabsV2.Content value="general" class="settings-v2-panel">
           <SettingsGeneralV2 sessionID={props.sessionID} />
+        </TabsV2.Content>
+        <TabsV2.Content value="appearance" class="settings-v2-panel">
+          <SettingsAppearanceV2 />
+        </TabsV2.Content>
+        <TabsV2.Content value="notifications" class="settings-v2-panel">
+          <SettingsNotificationsV2 />
         </TabsV2.Content>
         <TabsV2.Content value="shortcuts" class="settings-v2-panel">
           <SettingsKeybinds v2 />
@@ -110,12 +141,20 @@ export const DialogSettings: Component<{
         <TabsV2.Content value="servers" class="settings-v2-panel">
           <SettingsServersV2 />
         </TabsV2.Content>
-        <TabsV2.Content value="providers" class="settings-v2-panel">
-          <SettingsProvidersV2 directory={directory} onBack={showProviders} />
+        <TabsV2.Content value="projects" class="settings-v2-panel">
+          <SettingsProjectsV2 />
         </TabsV2.Content>
-        <TabsV2.Content value="models" class="settings-v2-panel">
-          <SettingsModelsV2 />
-        </TabsV2.Content>
+        <SettingsServerScope>
+          <TabsV2.Content value="providers" class="settings-v2-panel">
+            <SettingsProvidersV2 directory={directory} onBack={showProviders} />
+          </TabsV2.Content>
+          <TabsV2.Content value="models" class="settings-v2-panel">
+            <SettingsModelsV2 />
+          </TabsV2.Content>
+          <TabsV2.Content value="extensions" class="settings-v2-panel">
+            <SettingsExtensionsV2 />
+          </TabsV2.Content>
+        </SettingsServerScope>
       </TabsV2>
     </Dialog>
   )
