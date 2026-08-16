@@ -731,3 +731,54 @@ These environment variables enable experimental features that may change or be r
 | `OPENCODE_EXPERIMENTAL_PARALLEL`                | boolean | Enable parallel web search execution    |
 | `OPENCODE_EXPERIMENTAL_SCOUT`                   | boolean | Enable Scout subagent                   |
 | `OPENCODE_EXPERIMENTAL_WORKSPACES`              | boolean | Enable workspace support                |
+
+### mcp
+
+Manage Model Context Protocol (MCP) servers.
+
+```bash
+opencode mcp [command]
+```
+
+---
+
+#### add
+
+Add a new MCP server configuration. Supports both interactive prompts and non-interactive command-line arguments for local and remote MCP servers.
+
+```bash
+## Document non-interactive MCP registration options in CLI reference
+opencode mcp add
+
+# Non-interactive local MCP registration
+opencode mcp add <name> [--env KEY=VALUE]... -- <command> [args...]
+
+# Non-interactive remote MCP registration
+opencode mcp add <name> --url <endpoint-url> [--header "Header-Name=Header-Value"]...
+```
+
+##### Examples
+
+Add a local MCP server passing environment variables and command arguments after `--`:
+
+```bash
+opencode mcp add postgres \
+  --env PGUSER=orb \
+  -- npx -y @modelcontextprotocol/server-postgres postgresql://localhost/mydb
+```
+
+Add a remote MCP server with authentication headers and environment variable expansion:
+
+```bash
+opencode mcp add github \
+  --url https://api.githubcopilot.com/mcp \
+  --header "Authorization=Bearer {env:GITHUB_TOKEN}"
+```
+
+##### Flags
+
+| Flag | Short | Description |
+| ------------------------------------------- | ----- | --------------------------------------------------------------------------------------------------- |
+| <nobr><code>{"--url"}</code></nobr> | | URL endpoint for remote MCP server registration |
+| <nobr><code>{"--header"}</code></nobr> | | HTTP header to include for remote MCP servers (repeatable, format: `Key=Value` or `Key: Value`) |
+| <nobr><code>{"--env"}</code></nobr> | | Environment variable to set for local MCP servers (repeatable, format: `KEY=VALUE`) |
