@@ -731,3 +731,25 @@ These environment variables enable experimental features that may change or be r
 | `OPENCODE_EXPERIMENTAL_PARALLEL`                | boolean | Enable parallel web search execution    |
 | `OPENCODE_EXPERIMENTAL_SCOUT`                   | boolean | Enable Scout subagent                   |
 | `OPENCODE_EXPERIMENTAL_WORKSPACES`              | boolean | Enable workspace support                |
+
+### mcp add
+
+Register an MCP server from the command line. The existing interactive flow remains available when these options are not supplied.
+
+For a local MCP server, pass environment variables with `--env`. The option can be repeated:
+
+```bash
+opencode mcp add postgres \
+  --env PGUSER=orb \
+  -- npx -y @modelcontextprotocol/server-postgres postgresql://localhost/mydb
+```
+
+For a remote MCP server, pass its URL with `--url`. HTTP headers can be supplied with `--header`, which can also be repeated:
+
+```bash
+opencode mcp add github \
+  --url https://api.githubcopilot.com/mcp \
+  --header "Authorization=Bearer {env:GITHUB_TOKEN}"
+```
+
+Use `{env:VARIABLE_NAME}` in a header value to reference an environment variable at runtime.
